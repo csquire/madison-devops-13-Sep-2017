@@ -1,0 +1,20 @@
+---
+# Source: prometheus/templates/server-ingress.yaml
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-4.5.0
+    component: "server"
+    heritage: Tiller
+    release: RELEASE-NAME
+  name: RELEASE-NAME-prometheus-server
+spec:
+  rules:
+    - host: prometheus.minikube.info
+      http:
+        paths:
+          - backend:
+              serviceName: RELEASE-NAME-prometheus-server
+              servicePort: 80

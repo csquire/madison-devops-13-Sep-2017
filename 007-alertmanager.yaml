@@ -1,0 +1,199 @@
+---
+# Source: prometheus/templates/alertmanager-clusterrolebinding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-4.5.0
+    component: "alertmanager"
+    heritage: Tiller
+    release: RELEASE-NAME
+  name: RELEASE-NAME-prometheus-alertmanager
+subjects:
+  - kind: ServiceAccount
+    name: RELEASE-NAME-prometheus-alertmanager
+    namespace: NAMESPACE
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+
+---
+# Source: prometheus/templates/alertmanager-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-4.5.0
+    component: "alertmanager"
+    heritage: Tiller
+    release: RELEASE-NAME
+  name: RELEASE-NAME-prometheus-alertmanager
+data:
+  alertmanager.yml: |-
+    global:
+      # slack_api_url: ''
+
+    receivers:
+      - name: default-receiver
+        # slack_configs:
+        #  - channel: '@you'
+        #    send_resolved: true
+
+    route:
+      group_wait: 10s
+      group_interval: 5m
+      receiver: default-receiver
+      repeat_interval: 3h
+
+---
+# Source: prometheus/templates/alertmanager-deployment.yaml
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-4.5.0
+    component: "alertmanager"
+    heritage: Tiller
+    release: RELEASE-NAME
+  name: RELEASE-NAME-prometheus-alertmanager
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: prometheus
+        component: "alertmanager"
+        release: RELEASE-NAME
+    spec:
+      serviceAccountName: RELEASE-NAME-prometheus-alertmanager
+      containers:
+        - name: prometheus-alertmanager
+          image: "prom/alertmanager:v0.5.1"
+          imagePullPolicy: "IfNotPresent"
+          env:
+          args:
+            - --config.file=/etc/config/alertmanager.yml
+            - --storage.path=/data
+          ports:
+            - containerPort: 9093
+          readinessProbe:
+            httpGet:
+              path: /#/status
+              port: 9093
+            initialDelaySeconds: 30
+            timeoutSeconds: 30
+          resources:
+            {}
+
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/config
+            - name: storage-volume
+              mountPath: "/data"
+              subPath: ""
+
+        - name: prometheus-alertmanager-configmap-reload
+          image: "jimmidyson/configmap-reload:v0.1"
+          imagePullPolicy: "IfNotPresent"
+          args:
+            - --volume-dir=/etc/config
+            - --webhook-url=http://localhost:9093/-/reload
+          resources:
+            {}
+
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/config
+              readOnly: true
+      volumes:
+        - name: config-volume
+          configMap:
+            name: RELEASE-NAME-prometheus-alertmanager
+        - name: storage-volume
+          persistentVolumeClaim:
+            claimName: RELEASE-NAME-prometheus-alertmanager
+
+---
+# Source: prometheus/templates/alertmanager-ingress.yaml
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-4.5.0
+    component: "alertmanager"
+    heritage: Tiller
+    release: RELEASE-NAME
+  name: RELEASE-NAME-prometheus-alertmanager
+spec:
+  rules:
+    - host: alertmanager.minikube.info
+      http:
+        paths:
+          - backend:
+              serviceName: RELEASE-NAME-prometheus-alertmanager
+              servicePort: 80
+
+---
+# Source: prometheus/templates/alertmanager-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-4.5.0
+    component: "alertmanager"
+    heritage: Tiller
+    release: RELEASE-NAME
+  name: RELEASE-NAME-prometheus-alertmanager
+spec:
+  accessModes:
+    - ReadWriteOnce
+
+  resources:
+    requests:
+      storage: "2Gi"
+
+---
+# Source: prometheus/templates/alertmanager-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-4.5.0
+    component: "alertmanager"
+    heritage: Tiller
+    release: RELEASE-NAME
+  name: RELEASE-NAME-prometheus-alertmanager
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 9093
+  selector:
+    app: prometheus
+    component: "alertmanager"
+    release: RELEASE-NAME
+  type: "ClusterIP"
+
+---
+# Source: prometheus/templates/alertmanager-serviceaccount.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-4.5.0
+    component: "alertmanager"
+    heritage: Tiller
+    release: RELEASE-NAME
+  name: RELEASE-NAME-prometheus-alertmanager
+
